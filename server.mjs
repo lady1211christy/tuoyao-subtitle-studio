@@ -2,12 +2,12 @@
 import express from 'express';
 import multer from 'multer';
 import Anthropic from '@anthropic-ai/sdk';
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile, readdir, rename } from 'node:fs/promises';
+import { existsSync, statSync } from 'node:fs';
+import { mkdir, readFile, writeFile, readdir, rename, rm } from 'node:fs/promises';
 import { join, dirname, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import { probe, cutClip, transcribe, run } from './lib/media.mjs';
+import { probe, cutClip, transcribe, run, VIDEO_EXTS } from './lib/media.mjs';
 import { analyze, buildOverlayData, toSrt, Analysis } from './lib/analyze.mjs';
 import { renderVideo } from './lib/render.mjs';
 
@@ -17,9 +17,25 @@ const PORT = +process.env.PORT || 5177;
 await mkdir(join(PROJECTS, '_uploads'), { recursive: true });
 
 const app = express();
+
+// ── 只接受工具自己頁面送來的請求（防 CSRF 與 DNS rebinding）──
+const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
+const ALLOWED_ORIGINS = new Set([...ALLOWED_HOSTS].map(h => `http://${h}`));
+const deny = res => res.status(403).json({ error: '拒絕來自外部網站的請求' });
+app.use((req, res, next) => ALLOWED_HOSTS.has(req.headers.host) ? next() : deny(res));
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  const site = req.headers['sec-fetch-site'];
+  if (origin && !ALLOWED_ORIGINS.has(origin)) return deny(res);
+  if (site && !['same-origin', 'none'].includes(site)) return deny(res);
+  // 會改資料的請求必須帶自訂標頭：外部網頁無法在不經 CORS 預檢的情況下加上
+  if (!['GET', 'HEAD'].includes(req.method) && req.headers['x-studio-request'] !== '1') return deny(res);
+  next();
+});
+
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(here, 'public')));
-const upload = multer({ dest: join(PROJECTS, '_uploads') });
+const upload = multer({ dest: join(PROJECTS, '_uploads'), limits: { fileSize: 4 * 1024 ** 3, files: 1 } });
 
 // ── 專案存取 ──
 const pdir = id => {
@@ -69,7 +85,7 @@ async function pipeline(id) {
     const meta = await readJson(id, 'meta.json');
     const dir = pdir(id);
     await patchMeta(id, { status: 'cutting', step: '裁切影片中…' });
-    await cutClip(meta.sourceFile, dir, meta.start, meta.end);
+    await cutClip(meta.sourceFile, dir, meta.start, meta.end, meta.demuxer);
     await patchMeta(id, { status: 'transcribing', step: 'whisper 聽寫英文中（第一次使用會先下載模型）…' });
     const words = await transcribe(join(dir, 'clip.wav'), dir);
     if (!words.length) throw new Error('沒有聽到任何英文語音，請確認片段有聲音');
@@ -104,25 +120,39 @@ app.get('/api/projects', wrap(async (_req, res) => {
 app.post('/api/projects', upload.single('file'), wrap(async (req, res) => {
   const { path: localPath, source = '', density = 'medium' } = req.body;
   const start = +req.body.start || 0;
+  const badExt = name => !VIDEO_EXTS.has(extname(name).toLowerCase());
   let sourceFile;
   if (req.file) {
-    sourceFile = req.file.path + extname(req.file.originalname || '.mp4');
+    if (badExt(req.file.originalname || '')) {
+      await rm(req.file.path, { force: true });
+      return res.status(400).json({ error: '只支援 mp4、mov、m4v、mkv、webm、avi 影片檔' });
+    }
+    sourceFile = req.file.path + extname(req.file.originalname).toLowerCase();
     await rename(req.file.path, sourceFile);
   } else {
     sourceFile = resolve(String(localPath || '').trim().replace(/^~(?=\/)/, process.env.HOME));
-    if (!localPath || !existsSync(sourceFile)) return res.status(400).json({ error: `找不到影片檔：${localPath || '（未填）'}` });
+    if (!localPath || !existsSync(sourceFile) || !statSync(sourceFile).isFile()) {
+      return res.status(400).json({ error: `找不到影片檔：${localPath || '（未填）'}` });
+    }
+    if (badExt(sourceFile)) return res.status(400).json({ error: '只支援 mp4、mov、m4v、mkv、webm、avi 影片檔' });
   }
-  const info = await probe(sourceFile);
-  if (!info.hasAudio) return res.status(400).json({ error: '這個影片檔沒有聲音軌，無法聽寫' });
+  // 上傳的檔案沒通過檢查就刪掉，不留在暫存區
+  const reject = async (status, error) => {
+    if (req.file) await rm(sourceFile, { force: true });
+    return res.status(status).json({ error });
+  };
+  let info;
+  try { info = await probe(sourceFile); } catch (e) { return reject(e.status || 500, e.message); }
+  if (!info.hasAudio) return reject(400, '這個影片檔沒有聲音軌，無法聽寫');
   const end = Math.min(+req.body.end || info.duration, info.duration);
-  if (!(end > start)) return res.status(400).json({ error: '結束時間要大於開始時間' });
-  if (end - start > 600) return res.status(400).json({ error: '一次最多處理 10 分鐘，請把片段切短一點' });
+  if (!(end > start)) return reject(400, '結束時間要大於開始時間');
+  if (end - start > 600) return reject(400, '一次最多處理 10 分鐘，請把片段切短一點');
 
   const id = `${new Date().toISOString().slice(0, 10)}-${randomBytes(3).toString('hex')}`;
   await mkdir(pdir(id), { recursive: true });
   const now = new Date().toISOString();
   await writeJson(id, 'meta.json', {
-    id, createdAt: now, updatedAt: now, sourceFile, start, end, density,
+    id, createdAt: now, updatedAt: now, sourceFile, demuxer: info.demuxer, start, end, density,
     source: source.trim(), sourceStamp: source.trim() ? stamp(start) : '',
     status: 'queued', step: '排隊中',
   });
@@ -195,7 +225,13 @@ app.get('/api/projects/:id/files/:name', wrap(async (req, res) => {
   res.type(FILES[name]).sendFile(file);
 }));
 
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, '127.0.0.1', err => {
+  if (err) {
+    console.error(err.code === 'EADDRINUSE'
+      ? `✗ 埠號 ${PORT} 已被占用：可能工具已經在別的終端機視窗執行中。請先關掉那個視窗，或在 .env 改用其他 PORT。`
+      : `✗ 無法啟動：${err.message}`);
+    process.exit(1);
+  }
   console.log(`拓曜字幕工作室已啟動：http://127.0.0.1:${PORT}`);
   if (!hasKey()) console.log('⚠ 尚未設定 ANTHROPIC_API_KEY（.env），翻譯分析步驟會暫停');
 });

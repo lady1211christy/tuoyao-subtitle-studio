@@ -49,6 +49,43 @@
 - 卡片的「對應的字幕標記」必須和某句字幕裡的標記英文相同，卡片才會出現在影片上。
 - 目前只支援英文原音的影片。
 
+## 授權與出處
+
+### 程式碼：MIT 授權
+
+本專案程式碼以 [MIT 授權](LICENSE) 釋出。你可以免費使用、修改、散布，也可以商用，唯一的條件是**在你的副本或修改版本中保留原本的版權聲明與授權文字**（Copyright (c) 2026 拓曜知識宇宙 Tuoyao Nexus）。
+
+如果這個工具幫到你，歡迎在作品或說明裡註明「使用拓曜字幕工作室製作」並附上本 repo 連結。這是請求，不是授權條件。
+
+### 品牌素材不在授權範圍內
+
+MIT 授權只涵蓋程式碼。以下屬於拓曜知識宇宙的品牌識別，**不包含在授權內**：
+
+- 拓曜 logo（`public/logo.png`、`demo/logo.png`）
+- 「拓曜知識宇宙」「Tuoyao Nexus」「拓曜字幕工作室」等名稱
+
+如果你要拿去做自己的版本或公開發布，請換成你自己的 logo 和名稱：替換 `public/logo.png`，並修改 `public/overlay.html` 和 `public/index.html` 裡的品牌文字。
+
+### 示範內容
+
+- `docs/` 裡的示範影片與 `demo/data.js` 的英文原文，取自 Figure AI《[Figure All Hands 2026](https://www.youtube.com/watch?v=AoFwpf43wK0&t=322s)》05:22–05:34 的短片段，只用來展示工具功能，影片內容版權屬 Figure AI 所有。
+- 中文翻譯、語塊標記與學習卡片內容由本專案製作。
+
+### 使用者責任
+
+用這個工具處理的影片，請確認你有權使用。工具只負責產生字幕與學習卡片，不會替你取得任何影片的授權。
+
+### 使用的第三方工具
+
+| 工具 | 授權 |
+|---|---|
+| [openai-whisper](https://github.com/openai/whisper)（語音聽寫） | MIT |
+| [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript)（Claude API） | Apache-2.0 |
+| [Puppeteer](https://pptr.dev/)（渲染字幕圖層） | Apache-2.0 |
+| [Express](https://expressjs.com/)、[Multer](https://github.com/expressjs/multer)、[Zod](https://zod.dev/) | MIT |
+| [FFmpeg](https://ffmpeg.org/)（需自行安裝） | LGPL／GPL |
+| Poppins、Noto Sans TC 字型（由 Google Fonts 載入） | SIL Open Font License 1.1 |
+
 ## 專案結構
 
 ```
