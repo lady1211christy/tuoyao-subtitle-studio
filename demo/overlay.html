@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Subtitle Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+TC:wght@400;500;700&display=block" rel="stylesheet">
+<style>
+  :root {
+    --navy: #001a3d;
+    --navy-2: #10234a;
+    --mint: #3bceb6;
+    --aqua: #a5d8dd;
+    --violet: #7b6cf6;
+    --violet-soft: #b9b0ff;
+    --text: #ffffff;
+    --text-2: rgba(255,255,255,.78);
+    --text-3: rgba(255,255,255,.5);
+    --en: 'Poppins', 'Noto Sans TC', sans-serif;
+    --zh: 'Noto Sans TC', 'Poppins', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+  body.preview { background: #888 url('poster.jpg') center / cover no-repeat; }
+  #stage { position: relative; width: 1920px; height: 1080px; font-family: var(--zh); color: var(--text); }
+
+  /* ── 品牌標籤 ── */
+  .brand {
+    position: absolute; left: 56px; top: 48px; display: flex; align-items: center; gap: 14px;
+    padding: 10px 22px 10px 10px; border-radius: 999px;
+    background: rgba(0,26,61,.88); border: 1px solid rgba(59,206,182,.35);
+    box-shadow: 0 10px 30px rgba(0,18,41,.35);
+  }
+  .brand img { width: 44px; height: 44px; border-radius: 50%; background: #fff; }
+  .brand .name { font: 700 20px/1.1 var(--zh); letter-spacing: .04em; }
+  .brand .name small { display: block; font: 500 13px/1.3 var(--en); color: var(--mint); letter-spacing: .18em; margin-top: 3px; }
+  .brand .sep { width: 1px; height: 34px; background: rgba(255,255,255,.18); margin: 0 4px; }
+  .brand .src { font: 500 15px/1.35 var(--en); color: var(--text-2); }
+  .brand .src b { display: block; font-weight: 600; color: var(--aqua); font-size: 12px; letter-spacing: .16em; }
+
+  /* ── 字幕 ── */
+  .subs {
+    position: absolute; left: 50%; bottom: 58px; width: 1560px; transform: translateX(-50%);
+    padding: 26px 48px 28px; border-radius: 28px; text-align: center;
+    background: linear-gradient(180deg, rgba(0,26,61,.90), rgba(16,35,74,.92));
+    border: 1px solid rgba(165,216,221,.18);
+    box-shadow: 0 18px 50px rgba(0,18,41,.45);
+  }
+  .subs::before {
+    content: ''; position: absolute; left: 48px; right: 48px; top: 0; height: 3px; border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, var(--mint), var(--violet));
+  }
+  .line-en { font: 600 44px/1.35 var(--en); letter-spacing: .005em; min-height: 60px; }
+  .line-en.long { font-size: 38px; }
+  .line-zh { font: 500 36px/1.4 var(--zh); color: var(--aqua); margin-top: 8px; letter-spacing: .04em; min-height: 50px; }
+  .w { transition: none; }
+  .hl { padding: 0 .12em; margin: 0 -.04em; border-radius: .18em; background-repeat: no-repeat; background-position: 0 88%; }
+  .hl.chunk { color: #d8fff8; background-image: linear-gradient(rgba(59,206,182,.42), rgba(59,206,182,.42)); }
+  .hl.term  { color: #e3deff; background-image: linear-gradient(rgba(123,108,246,.55), rgba(123,108,246,.55)); }
+  .line-zh .hl.chunk { color: var(--mint); }
+  .line-zh .hl.term  { color: var(--violet-soft); }
+
+  /* ── 學習卡片 ── */
+  .card {
+    position: absolute; right: 56px; top: 48px; width: 540px; height: 430px;
+    padding: 30px 34px 30px 40px; border-radius: 26px; overflow: hidden;
+    background: linear-gradient(160deg, rgba(0,26,61,.95), rgba(16,35,74,.95));
+    border: 1px solid rgba(165,216,221,.2);
+    box-shadow: 0 24px 60px rgba(0,18,41,.45);
+    display: flex; flex-direction: column;
+  }
+  .card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: linear-gradient(180deg, var(--mint), var(--violet)); }
+  .card .head { display: flex; justify-content: space-between; align-items: center; }
+  .tag { font: 600 15px/1 var(--zh); letter-spacing: .1em; padding: 8px 14px; border-radius: 999px; }
+  .tag.chunk { color: var(--navy); background: var(--mint); }
+  .tag.term  { color: #fff; background: var(--violet); }
+  .count { font: 500 15px/1 var(--en); color: var(--text-3); letter-spacing: .12em; }
+  .count b { color: var(--text); font-weight: 600; }
+  .phrase { font: 700 38px/1.22 var(--en); margin-top: 22px; letter-spacing: -.005em; }
+  .phrase.long { font-size: 31px; }
+  .phrase .abbr { font: 600 18px/1 var(--en); color: var(--violet-soft); border: 1px solid rgba(185,176,255,.5); border-radius: 8px; padding: 4px 8px; vertical-align: middle; margin-left: 8px; }
+  .card.chunk .phrase { color: #d8fff8; }
+  .card.term .phrase  { color: #e3deff; }
+  .meaning { font: 700 30px/1.3 var(--zh); margin-top: 10px; }
+  .card.chunk .meaning { color: var(--mint); }
+  .card.term .meaning  { color: var(--violet-soft); }
+  .note { font: 400 20px/1.6 var(--zh); color: var(--text-2); margin-top: 14px; text-wrap: pretty; }
+  .ex { margin-top: auto; padding: 14px 18px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+  .ex .en { font: italic 400 20px/1.4 var(--en); color: var(--text); }
+  .ex .zh { font: 400 18px/1.4 var(--zh); color: var(--aqua); margin-top: 4px; }
+  .stats { margin-top: auto; display: grid; gap: 12px; }
+  .stat { display: grid; grid-template-columns: 150px 1fr 54px; align-items: center; gap: 12px; font: 500 17px/1 var(--zh); color: var(--text-2); }
+  .stat .bar { height: 12px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .stat .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--violet), var(--violet-soft)); }
+  .stat .v { font: 700 20px/1 var(--en); color: #fff; text-align: right; }
+  .extra { margin-top: auto; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; background: rgba(123,108,246,.14); border: 1px solid rgba(123,108,246,.35); }
+  .extra .tag { font-size: 12px; padding: 6px 10px; flex: none; }
+  .extra .p { font: 600 21px/1.3 var(--en); color: #e3deff; }
+  .extra .z { font: 400 17px/1.5 var(--zh); color: var(--text-2); margin-top: 3px; }
+
+  /* ── 收合後的複習膠囊 ── */
+  .chip {
+    position: absolute; right: 56px; width: 540px; height: 62px; padding: 0 22px 0 18px;
+    display: flex; align-items: center; gap: 14px; border-radius: 18px;
+    background: rgba(0,26,61,.86); border: 1px solid rgba(165,216,221,.16);
+    box-shadow: 0 10px 26px rgba(0,18,41,.3);
+  }
+  .chip .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .chip.chunk .dot { background: var(--mint); box-shadow: 0 0 0 5px rgba(59,206,182,.18); }
+  .chip.term .dot  { background: var(--violet); box-shadow: 0 0 0 5px rgba(123,108,246,.22); }
+  .chip .p { font: 600 21px/1 var(--en); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip .z { font: 500 18px/1 var(--zh); color: var(--aqua); margin-left: auto; white-space: nowrap; }
+
+  .progress { position: absolute; left: 0; bottom: 0; height: 6px; background: linear-gradient(90deg, var(--mint), var(--violet)); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="brand">
+    <img src="logo.png" alt="">
+    <div class="name">拓曜知識宇宙<small>TUOYAO NEXUS</small></div>
+    <div class="sep"></div>
+    <div class="src"><b>SOURCE</b><span id="src"></span></div>
+  </div>
+  <div id="cards"></div>
+  <div class="subs" id="subs"><div class="line-en" id="en"></div><div class="line-zh" id="zh"></div></div>
+  <div class="progress" id="progress"></div>
+</div>
+<script src="data.js"></script>
+<script>
+const D = window.DEMO;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const easeOut = x => 1 - Math.pow(1 - clamp(x), 3);
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const isPunct = tok => !/[\p{L}\p{N}]/u.test(tok);
+
+document.getElementById('src').textContent = `${D.source} · ${D.sourceStamp}`;
+
+// ── 字幕：預先切 token，記錄每個 token 的開口時間 ──
+function buildEn(cue) {
+  let ti = 0, html = '', first = true;
+  const spans = [];
+  for (const part of cue.en) {
+    const txt = typeof part === 'string' ? part : part.s;
+    const toks = txt.split(/\s+/).filter(Boolean);
+    const inner = toks.map(tok => {
+      const glue = isPunct(tok) && /^[,.!?]/.test(tok);
+      const t = isPunct(tok) ? cue.times[Math.max(0, ti - 1)] : cue.times[ti++];
+      const sp = (first || glue) ? '' : ' ';
+      first = false;
+      return { sp, html: `<span class="w" data-t="${t}">${esc(tok)}</span>`, t };
+    });
+    if (typeof part === 'string') {
+      html += inner.map(x => x.sp + x.html).join('');
+    } else {
+      const ts = inner.map(x => x.t);
+      html += inner[0].sp + `<span class="hl ${part.t}" data-a="${ts[0]}" data-b="${ts[ts.length - 1] + 0.3}">` + inner.map((x, i) => (i ? x.sp : '') + x.html).join('') + '</span>';
+    }
+  }
+  return html;
+}
+function buildZh(cue) {
+  // 中文螢光筆跟著英文對應語塊同步劃過
+  const enHl = cue.en.filter(p => typeof p !== 'string');
+  let k = 0;
+  const tokTimes = cue.times;
+  return cue.zh.map(part => {
+    if (typeof part === 'string') return esc(part);
+    // 找出對應英文語塊的時間區間
+    let ti = 0, a = cue.start, b = cue.end;
+    for (const p of cue.en) {
+      const txt = typeof p === 'string' ? p : p.s;
+      const n = txt.split(/\s+/).filter(t => t && !isPunct(t)).length;
+      if (p === enHl[k]) { a = tokTimes[ti]; b = tokTimes[ti + n - 1] + 0.3; break; }
+      ti += n;
+    }
+    k++;
+    return `<span class="hl ${part.t}" data-a="${a}" data-b="${b}">${esc(part.s)}</span>`;
+  }).join('');
+}
+const cueHtml = D.cues.map(c => ({ en: buildEn(c), zh: buildZh(c) }));
+const cueText = D.cues.map(c => c.en.map(p => typeof p === 'string' ? p : p.s).join(' '));
+
+// ── 卡片 ──
+function cardHtml(c, i) {
+  let body = `<div class="head"><span class="tag ${c.type}">${c.label}</span><span class="count"><b>${String(i + 1).padStart(2, '0')}</b> / ${String(D.cards.length).padStart(2, '0')}</span></div>
+    <div class="phrase${c.phrase.length > 26 ? ' long' : ''}">${esc(c.phrase)}${c.abbr ? `<span class="abbr">${c.abbr}</span>` : ''}</div>
+    <div class="meaning">${esc(c.zh)}</div>
+    <div class="note">${esc(c.note)}</div>`;
+  if (c.ex) body += `<div class="ex"><div class="en">${esc(c.ex.en)}</div><div class="zh">${esc(c.ex.zh)}</div></div>`;
+  if (c.stats) {
+    const max = Math.max(...c.stats.map(s => s.v));
+    body += `<div class="stats">${c.stats.map(s => `<div class="stat"><span>${esc(s.k)}</span><div class="bar"><i data-w="${s.v / max}"></i></div><span class="v">${s.v}${s.v === max ? '+' : ''}</span></div>`).join('')}</div>`;
+  }
+  if (c.extra) body += `<div class="extra"><span class="tag term">${c.extra.label}</span><div><div class="p">${esc(c.extra.phrase)}</div><div class="z">${esc(c.extra.zh)}</div></div></div>`;
+  return `<div class="card ${c.type}" id="card${i}">${body}</div>`;
+}
+const chipHtml = (c, i) => `<div class="chip ${c.type}" id="chip${i}"><span class="dot"></span><span class="p">${esc(c.phrase)}</span><span class="z">${esc(c.zh)}</span></div>`;
+document.getElementById('cards').innerHTML = D.cards.map(cardHtml).join('') + D.cards.map(chipHtml).join('');
+
+const CHIP_TOP = 48 + 430 + 22, CHIP_PITCH = 62 + 12;
+let shownCue = -1;
+
+function render(t) {
+  // 字幕
+  const enEl = document.getElementById('en'), zhEl = document.getElementById('zh');
+  let ci = -1;
+  D.cues.forEach((c, i) => { if (t >= c.start - 0.05) ci = i; });
+  const cue = D.cues[ci];
+  const live = cue && t <= cue.end + 0.15;
+  if (ci !== shownCue) { enEl.classList.toggle('long', ci >= 0 && enEl.textContent !== null && cueText[ci].length > 60); enEl.innerHTML = ci >= 0 ? cueHtml[ci].en : ''; zhEl.innerHTML = ci >= 0 ? cueHtml[ci].zh : ''; shownCue = ci; }
+  const fadeIn = cue ? easeOut((t - cue.start + 0.05) / 0.22) : 0;
+  const fadeOut = cue ? 1 - clamp((t - cue.end) / 0.2) : 0;
+  const a = live ? Math.min(fadeIn, fadeOut) : 0;
+  for (const el of [enEl, zhEl]) { el.style.opacity = a; el.style.transform = `translateY(${(1 - fadeIn) * 10}px)`; }
+  enEl.querySelectorAll('.w').forEach(w => {
+    const p = clamp((t - +w.dataset.t + 0.04) / 0.16);
+    w.style.opacity = 0.38 + 0.62 * p;
+  });
+  document.querySelectorAll('#subs .hl').forEach(h => {
+    const p = easeOut((t - +h.dataset.a) / (+h.dataset.b - +h.dataset.a));
+    h.style.backgroundSize = `${p * 100}% 42%`;
+  });
+  const subsBox = document.getElementById('subs');
+  subsBox.style.opacity = easeOut((t - 0) / 0.3);
+
+  // 卡片：一次一張大卡，前一張收合成膠囊往下疊
+  D.cards.forEach((c, i) => {
+    const el = document.getElementById('card' + i);
+    const next = D.cards[i + 1];
+    const pin = easeOut((t - c.at) / 0.45);
+    const pout = next ? clamp((t - next.at) / 0.28) : 0;
+    const op = t < c.at ? 0 : pin * (1 - pout);
+    el.style.opacity = op;
+    el.style.visibility = op > 0.001 ? 'visible' : 'hidden';
+    el.style.transform = `translateX(${(1 - pin) * 48}px) translateY(${-pout * 14}px) scale(${1 - pout * 0.04})`;
+    el.querySelectorAll('.bar i').forEach((b, k) => {
+      b.style.width = `${easeOut((t - c.at - 0.35 - k * 0.15) / 0.7) * +b.dataset.w * 100}%`;
+    });
+    // 膠囊：在下一張卡片出現時誕生，越新越靠上
+    const chip = document.getElementById('chip' + i);
+    if (!next || t < next.at) { chip.style.opacity = 0; chip.style.visibility = 'hidden'; return; }
+    const q = easeOut((t - next.at - 0.1) / 0.45);
+    let y = CHIP_TOP;
+    for (let j = i + 1; j < D.cards.length - 1; j++) {
+      const born = D.cards[j + 1].at;
+      y += easeOut((t - born - 0.1) / 0.45) * CHIP_PITCH;
+    }
+    chip.style.visibility = 'visible';
+    chip.style.opacity = q;
+    chip.style.top = `${y - (1 - q) * 18}px`;
+  });
+
+  document.getElementById('progress').style.width = `${clamp(t / D.duration) * 100}%`;
+}
+window.render = render;
+render(0);
+
+// 預覽模式：overlay.html?preview 會疊在截圖上自動播放
+if (location.search.includes('preview')) {
+  document.body.classList.add('preview');
+  const t0 = performance.now();
+  (function loop() { render(((performance.now() - t0) / 1000) % (D.duration + 1)); requestAnimationFrame(loop); })();
+}
+</script>
+</body>
+</html>

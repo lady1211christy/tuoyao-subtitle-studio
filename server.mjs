@@ -1,0 +1,201 @@
+// 拓曜字幕工作室：本機伺服器（只綁 127.0.0.1）
+import express from 'express';
+import multer from 'multer';
+import Anthropic from '@anthropic-ai/sdk';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile, readdir, rename } from 'node:fs/promises';
+import { join, dirname, resolve, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomBytes } from 'node:crypto';
+import { probe, cutClip, transcribe, run } from './lib/media.mjs';
+import { analyze, buildOverlayData, toSrt, Analysis } from './lib/analyze.mjs';
+import { renderVideo } from './lib/render.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const PROJECTS = join(here, 'projects');
+const PORT = +process.env.PORT || 5177;
+await mkdir(join(PROJECTS, '_uploads'), { recursive: true });
+
+const app = express();
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static(join(here, 'public')));
+const upload = multer({ dest: join(PROJECTS, '_uploads') });
+
+// ── 專案存取 ──
+const pdir = id => {
+  if (!/^[a-z0-9-]+$/.test(id)) throw Object.assign(new Error('專案編號不正確'), { status: 400 });
+  return join(PROJECTS, id);
+};
+const readJson = async (id, name) => JSON.parse(await readFile(join(pdir(id), name), 'utf8'));
+const writeJson = (id, name, v) => writeFile(join(pdir(id), name), JSON.stringify(v, null, 2));
+async function patchMeta(id, patch) {
+  const meta = { ...(await readJson(id, 'meta.json')), ...patch, updatedAt: new Date().toISOString() };
+  await writeJson(id, 'meta.json', meta);
+  return meta;
+}
+const stamp = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+const busy = new Set();
+
+async function rebuild(id) {
+  const meta = await readJson(id, 'meta.json');
+  const words = await readJson(id, 'words.json');
+  const analysis = await readJson(id, 'analysis.json');
+  const data = buildOverlayData(words, analysis, {
+    source: meta.source, sourceStamp: meta.sourceStamp, duration: meta.end - meta.start,
+  });
+  await writeJson(id, 'data.json', data);
+  await writeFile(join(pdir(id), 'subtitles.srt'), toSrt(data));
+  return data;
+}
+
+async function runAnalyze(id) {
+  const meta = await readJson(id, 'meta.json');
+  if (!hasKey()) {
+    await patchMeta(id, { status: 'needs_key', step: '已完成聽寫。請在 .env 填入 ANTHROPIC_API_KEY，重新啟動工具後按「重新分析」。' });
+    return;
+  }
+  await patchMeta(id, { status: 'analyzing', step: 'Claude 正在翻譯、挑選語塊與專有名詞…', error: null });
+  const words = await readJson(id, 'words.json');
+  const analysis = await analyze(words, { source: meta.source, density: meta.density });
+  await writeJson(id, 'analysis.json', analysis);
+  await rebuild(id);
+  await patchMeta(id, { status: 'ready', step: '分析完成，可以預覽與修改' });
+}
+
+async function pipeline(id) {
+  busy.add(id);
+  try {
+    const meta = await readJson(id, 'meta.json');
+    const dir = pdir(id);
+    await patchMeta(id, { status: 'cutting', step: '裁切影片中…' });
+    await cutClip(meta.sourceFile, dir, meta.start, meta.end);
+    await patchMeta(id, { status: 'transcribing', step: 'whisper 聽寫英文中（第一次使用會先下載模型）…' });
+    const words = await transcribe(join(dir, 'clip.wav'), dir);
+    if (!words.length) throw new Error('沒有聽到任何英文語音，請確認片段有聲音');
+    await writeJson(id, 'words.json', words);
+    await runAnalyze(id);
+  } catch (e) {
+    await patchMeta(id, { status: 'error', error: e.message, step: '處理失敗' });
+  } finally {
+    busy.delete(id);
+  }
+}
+
+const wrap = fn => (req, res) => fn(req, res).catch(e => res.status(e.status || 500).json({ error: e.message }));
+
+// ── API ──
+app.get('/api/health', wrap(async (_req, res) => {
+  const check = async (cmd, args) => { try { await run(cmd, args); return true; } catch { return false; } };
+  res.json({
+    apiKey: hasKey(),
+    ffmpeg: await check('ffmpeg', ['-version']),
+    whisper: await check('whisper', ['--help']),
+    whisperModel: process.env.WHISPER_MODEL || 'medium.en',
+  });
+}));
+
+app.get('/api/projects', wrap(async (_req, res) => {
+  const ids = (await readdir(PROJECTS)).filter(d => !d.startsWith('_') && existsSync(join(PROJECTS, d, 'meta.json')));
+  const list = await Promise.all(ids.map(id => readJson(id, 'meta.json')));
+  res.json(list.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+}));
+
+app.post('/api/projects', upload.single('file'), wrap(async (req, res) => {
+  const { path: localPath, source = '', density = 'medium' } = req.body;
+  const start = +req.body.start || 0;
+  let sourceFile;
+  if (req.file) {
+    sourceFile = req.file.path + extname(req.file.originalname || '.mp4');
+    await rename(req.file.path, sourceFile);
+  } else {
+    sourceFile = resolve(String(localPath || '').trim().replace(/^~(?=\/)/, process.env.HOME));
+    if (!localPath || !existsSync(sourceFile)) return res.status(400).json({ error: `找不到影片檔：${localPath || '（未填）'}` });
+  }
+  const info = await probe(sourceFile);
+  if (!info.hasAudio) return res.status(400).json({ error: '這個影片檔沒有聲音軌，無法聽寫' });
+  const end = Math.min(+req.body.end || info.duration, info.duration);
+  if (!(end > start)) return res.status(400).json({ error: '結束時間要大於開始時間' });
+  if (end - start > 600) return res.status(400).json({ error: '一次最多處理 10 分鐘，請把片段切短一點' });
+
+  const id = `${new Date().toISOString().slice(0, 10)}-${randomBytes(3).toString('hex')}`;
+  await mkdir(pdir(id), { recursive: true });
+  const now = new Date().toISOString();
+  await writeJson(id, 'meta.json', {
+    id, createdAt: now, updatedAt: now, sourceFile, start, end, density,
+    source: source.trim(), sourceStamp: source.trim() ? stamp(start) : '',
+    status: 'queued', step: '排隊中',
+  });
+  pipeline(id);
+  res.json({ id });
+}));
+
+app.get('/api/projects/:id', wrap(async (req, res) => {
+  const meta = await readJson(req.params.id, 'meta.json');
+  res.json({ ...meta, busy: busy.has(req.params.id) });
+}));
+
+app.get('/api/projects/:id/data', wrap(async (req, res) => res.json(await readJson(req.params.id, 'data.json'))));
+app.get('/api/projects/:id/analysis', wrap(async (req, res) => {
+  res.json({ analysis: await readJson(req.params.id, 'analysis.json'), words: await readJson(req.params.id, 'words.json') });
+}));
+
+app.put('/api/projects/:id/analysis', wrap(async (req, res) => {
+  const analysis = Analysis.parse(req.body);
+  await writeJson(req.params.id, 'analysis.json', analysis);
+  res.json(await rebuild(req.params.id));
+}));
+
+app.put('/api/projects/:id/meta', wrap(async (req, res) => {
+  const { source = '' } = req.body;
+  const meta = await readJson(req.params.id, 'meta.json');
+  await patchMeta(req.params.id, { source: source.trim(), sourceStamp: source.trim() ? stamp(meta.start) : '' });
+  res.json(await rebuild(req.params.id));
+}));
+
+app.post('/api/projects/:id/reanalyze', wrap(async (req, res) => {
+  const { id } = req.params;
+  if (busy.has(id)) return res.status(409).json({ error: '這個專案正在處理中' });
+  if (req.body?.density) await patchMeta(id, { density: req.body.density });
+  busy.add(id);
+  runAnalyze(id)
+    .catch(e => patchMeta(id, { status: 'error', error: e instanceof Anthropic.AuthenticationError ? 'API 金鑰無效，請檢查 .env' : e.message, step: '分析失敗' }))
+    .finally(() => busy.delete(id));
+  res.json({ ok: true });
+}));
+
+app.post('/api/projects/:id/render', wrap(async (req, res) => {
+  const { id } = req.params;
+  if (busy.has(id)) return res.status(409).json({ error: '這個專案正在處理中' });
+  const meta = await readJson(id, 'meta.json');
+  busy.add(id);
+  await patchMeta(id, { status: 'rendering', step: '準備渲染…', error: null });
+  renderVideo({
+    overlayUrl: `http://127.0.0.1:${PORT}/overlay.html?project=${id}`,
+    dir: pdir(id), clip: join(pdir(id), 'clip.mp4'), duration: meta.end - meta.start,
+    out: join(pdir(id), 'output.mp4'),
+    onProgress: p => patchMeta(id, {
+      step: p.stage === 'frames' ? `渲染字幕圖層 ${p.done} / ${p.total} 格` : '合成影片中…',
+      progress: p.stage === 'frames' ? p.done / p.total : 1,
+    }),
+  })
+    .then(() => patchMeta(id, { status: 'done', step: '影片輸出完成', progress: null, renderedAt: new Date().toISOString() }))
+    .catch(e => patchMeta(id, { status: 'error', error: e.message, step: '輸出失敗', progress: null }))
+    .finally(() => busy.delete(id));
+  res.json({ ok: true });
+}));
+
+const FILES = { 'clip.mp4': 'video/mp4', 'output.mp4': 'video/mp4', 'subtitles.srt': 'application/x-subrip' };
+app.get('/api/projects/:id/files/:name', wrap(async (req, res) => {
+  const { id, name } = req.params;
+  if (!FILES[name]) return res.status(404).json({ error: '沒有這個檔案' });
+  const file = join(pdir(id), name);
+  if (!existsSync(file)) return res.status(404).json({ error: '檔案還沒產生' });
+  if (req.query.download) res.attachment(`${id}-${name}`);
+  res.type(FILES[name]).sendFile(file);
+}));
+
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`拓曜字幕工作室已啟動：http://127.0.0.1:${PORT}`);
+  if (!hasKey()) console.log('⚠ 尚未設定 ANTHROPIC_API_KEY（.env），翻譯分析步驟會暫停');
+});

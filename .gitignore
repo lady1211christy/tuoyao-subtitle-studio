@@ -1,0 +1,19 @@
+# 金鑰與本機設定（絕不提交）
+.env
+.env.*
+!.env.example
+
+# 套件與專案產出
+node_modules/
+projects/
+
+# 影片、音檔與素材（含第三方影片畫面，不公開）
+*.mp4
+*.mov
+*.m4a
+*.wav
+*.webm
+demo/threads/
+
+# 系統檔
+.DS_Store

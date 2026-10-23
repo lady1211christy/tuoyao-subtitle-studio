@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拓曜字幕工作室</title>
+<link rel="icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #001229; --panel: #001a3d; --panel-2: #10234a; --line: rgba(165,216,221,.14);
+    --mint: #3bceb6; --mint-d: #0d9488; --aqua: #a5d8dd; --violet: #7b6cf6; --violet-soft: #b9b0ff;
+    --text: #fff; --text-2: rgba(255,255,255,.72); --text-3: rgba(255,255,255,.45);
+    --danger: #ff7a7a; --warn: #ffc65c;
+    --font: 'Poppins', 'Noto Sans TC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--text); font: 400 14px/1.6 var(--font); min-height: 100vh; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--mint); }
+
+  header { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  header img { width: 36px; height: 36px; border-radius: 50%; background: #fff; }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: .04em; }
+  header h1 small { display: block; font-size: 11px; font-weight: 500; color: var(--mint); letter-spacing: .18em; }
+  .health { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--text-2); white-space: nowrap; }
+  .pill.ok { border-color: rgba(59,206,182,.5); color: var(--mint); }
+  .pill.bad { border-color: rgba(255,122,122,.5); color: var(--danger); }
+
+  .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) 440px; gap: 20px; padding: 20px 24px; align-items: start; }
+  @media (max-width: 1400px) { .layout { grid-template-columns: 280px minmax(0, 1fr); } .editor { grid-column: 1 / -1; } }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 16px; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  .panel + .panel { margin-top: 16px; }
+  .sec-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--aqua); margin-bottom: 12px; }
+  .sec-title::before { content: ''; width: 4px; height: 14px; border-radius: 2px; background: linear-gradient(var(--mint), var(--violet)); }
+
+  label { display: block; font-size: 12px; color: var(--text-2); margin: 10px 0 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--mint); }
+  textarea { resize: vertical; min-height: 54px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .drop { margin-top: 8px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 14px; text-align: center; color: var(--text-3); font-size: 12px; cursor: pointer; }
+  .drop.over, .drop.has { border-color: var(--mint); color: var(--mint); }
+  .hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 8px 14px; cursor: pointer; font-weight: 500; text-decoration: none; color: var(--text); }
+  .btn:hover { border-color: var(--mint); color: var(--mint); }
+  .btn.primary { border: 0; color: #001a3d; font-weight: 600; background: linear-gradient(90deg, var(--mint), #6fd9c8); }
+  .btn.primary:hover { color: #001a3d; filter: brightness(1.06); }
+  .btn.violet { border: 0; color: #fff; background: linear-gradient(90deg, var(--violet), #9a8ef8); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.block { width: 100%; margin-top: 14px; }
+  .btn.sm { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
+
+  .plist { display: grid; gap: 8px; }
+  .pitem { text-align: left; width: 100%; background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+  .pitem.on { border-color: var(--mint); }
+  .pitem b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pitem span { font-size: 12px; color: var(--text-3); }
+  .st { font-size: 11px; padding: 1px 8px; border-radius: 99px; margin-left: 6px; background: rgba(255,255,255,.08); color: var(--text-2); }
+  .st.ready, .st.done { background: rgba(59,206,182,.16); color: var(--mint); }
+  .st.error { background: rgba(255,122,122,.15); color: var(--danger); }
+  .st.needs_key { background: rgba(255,198,92,.15); color: var(--warn); }
+
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #000; }
+  .stage video { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stage iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; background: transparent; }
+  .stage .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); text-align: center; padding: 20px; }
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  .controls input[type=range] { flex: 1; min-width: 160px; accent-color: var(--mint); }
+  .time { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 13px; min-width: 96px; }
+  .controls select { width: auto; padding: 4px 8px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); margin: 0; cursor: pointer; }
+
+  .status { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .status .msg { color: var(--text-2); flex: 1; min-width: 200px; }
+  .status .msg.err { color: var(--danger); }
+  .bar { height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; margin-bottom: 14px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--mint), var(--violet)); transition: width .4s; }
+  .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(59,206,182,.25); border-top-color: var(--mint); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+  .actions .grow { flex: 1; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tab { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: transparent; cursor: pointer; color: var(--text-2); }
+  .tab.on { background: var(--panel-2); border-color: var(--mint); color: var(--mint); font-weight: 600; }
+  .elist { display: grid; gap: 10px; max-height: calc(100vh - 260px); overflow: auto; padding-right: 4px; }
+  .item { background: var(--panel-2); border-radius: 14px; padding: 12px; border: 1px solid transparent; }
+  .item.now { border-color: rgba(59,206,182,.6); }
+  .item .top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .item .tc { font-size: 12px; color: var(--mint); cursor: pointer; font-variant-numeric: tabular-nums; }
+  .item .en { font-size: 14px; line-height: 1.5; margin-bottom: 6px; }
+  .hlrow { display: grid; grid-template-columns: 82px 1fr 1fr 28px; gap: 6px; margin-top: 6px; }
+  .hlrow select, .hlrow input { padding: 5px 8px; font-size: 13px; }
+  .x { border: 0; background: transparent; color: var(--text-3); cursor: pointer; font-size: 16px; }
+  .x:hover { color: var(--danger); }
+  .chunk-dot, .term-dot, .pattern-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .chunk-dot, .pattern-dot { background: var(--mint); }
+  .term-dot { background: var(--violet); }
+  .savebar { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .savebar .dirty { color: var(--warn); font-size: 12px; }
+  .toast { position: fixed; right: 20px; bottom: 20px; background: var(--panel-2); border: 1px solid var(--mint); color: var(--text); padding: 10px 16px; border-radius: 12px; opacity: 0; transform: translateY(8px); transition: .25s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { border-color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <img src="/logo.png" alt="">
+  <h1>拓曜字幕工作室<small>TUOYAO SUBTITLE STUDIO</small></h1>
+  <div class="health" id="health"></div>
+</header>
+
+<div class="layout">
+  <aside>
+    <form class="panel" id="newForm">
+      <div class="sec-title">新增專案</div>
+      <label for="fPath">影片檔路徑</label>
+      <input type="text" id="fPath" placeholder="~/Downloads/影片.mp4">
+      <div class="drop" id="drop">或把影片拖到這裡上傳</div>
+      <input type="file" id="fFile" accept="video/*" hidden>
+      <div class="row">
+        <div><label for="fStart">開始（分:秒）</label><input type="text" id="fStart" placeholder="5:24"></div>
+        <div><label for="fEnd">結束（分:秒）</label><input type="text" id="fEnd" placeholder="5:34"></div>
+      </div>
+      <label for="fSource">影片來源名稱（顯示在左上角）</label>
+      <input type="text" id="fSource" placeholder="Figure All Hands 2026">
+      <label for="fDensity">學習卡片密度</label>
+      <select id="fDensity">
+        <option value="low">少：每 6–8 秒 1 張</option>
+        <option value="medium" selected>中：每 3–5 秒 1 張</option>
+        <option value="high">多：每 2–3 秒 1 張</option>
+      </select>
+      <button class="btn primary block" id="fSubmit">開始處理</button>
+      <p class="hint">一次最多 10 分鐘。流程：裁切 → 聽寫 → Claude 翻譯分析。</p>
+    </form>
+    <div class="panel">
+      <div class="sec-title">我的專案</div>
+      <div class="plist" id="plist"><p class="hint">還沒有專案</p></div>
+    </div>
+  </aside>
+
+  <main class="panel">
+    <div id="statusWrap"></div>
+    <div class="stage" id="stage">
+      <video id="video" playsinline preload="auto"></video>
+      <iframe id="overlay" src="/overlay.html" title="字幕圖層"></iframe>
+      <div class="empty" id="empty">從左邊新增或選一個專案</div>
+    </div>
+    <div class="controls">
+      <button class="btn sm" id="play" disabled>▶ 播放</button>
+      <input type="range" id="seek" min="0" max="1000" value="0" disabled>
+      <span class="time" id="time">00:00 / 00:00</span>
+      <select id="speed" aria-label="播放速度"><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option></select>
+      <label class="toggle"><input type="checkbox" id="showOverlay" checked> 字幕圖層</label>
+    </div>
+    <div class="actions" id="actions" hidden>
+      <label class="toggle" for="srcEdit">來源名稱</label>
+      <input type="text" id="srcEdit" style="max-width:260px" placeholder="留白則只顯示品牌">
+      <button class="btn sm" id="srcSave">套用</button>
+      <span class="grow"></span>
+      <select id="reDensity" style="width:auto"><option value="low">卡片少</option><option value="medium">卡片中</option><option value="high">卡片多</option></select>
+      <button class="btn sm" id="reanalyze">重新分析</button>
+      <button class="btn violet" id="render">輸出影片</button>
+    </div>
+    <div class="actions" id="downloads" hidden>
+      <a class="btn sm" id="dlMp4" href="#">⬇ 下載 MP4</a>
+      <a class="btn sm" id="dlSrt" href="#">⬇ 下載 SRT 字幕</a>
+      <a class="btn sm" id="viewMp4" href="#" target="_blank">在新分頁播放成品</a>
+    </div>
+  </main>
+
+  <section class="panel editor" id="editor" hidden>
+    <div class="tabs">
+      <button class="tab on" data-tab="cues">字幕與標記</button>
+      <button class="tab" data-tab="cards">學習卡片</button>
+    </div>
+    <div class="elist" id="elist"></div>
+    <div class="savebar">
+      <button class="btn primary" id="save" disabled>儲存並更新預覽</button>
+      <span class="dirty" id="dirty"></span>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const parseTime = v => {
+  v = String(v || '').trim();
+  if (!v) return NaN;
+  return v.split(':').reduce((acc, x) => acc * 60 + parseFloat(x), 0);
+};
+const STATUS = { queued: '排隊中', cutting: '裁切中', transcribing: '聽寫中', analyzing: '分析中', needs_key: '缺金鑰', ready: '可編輯', rendering: '輸出中', done: '已輸出', error: '失敗' };
+const BUSY = ['queued', 'cutting', 'transcribing', 'analyzing', 'rendering'];
+
+function toast(msg, err = false) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.className = 'toast', 2600);
+}
+async function api(url, opts = {}) {
+  const r = await fetch(url, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `請求失敗（${r.status}）`);
+  return j;
+}
+
+// ── 系統檢查 ──
+async function loadHealth() {
+  const h = await api('/api/health');
+  $('#health').innerHTML = [
+    [h.apiKey, h.apiKey ? 'Claude API 已連線' : 'Claude API 金鑰未設定'],
+    [h.whisper, `whisper · ${h.whisperModel}`],
+    [h.ffmpeg, 'ffmpeg'],
+  ].map(([ok, t]) => `<span class="pill ${ok ? 'ok' : 'bad'}">${ok ? '●' : '○'} ${esc(t)}</span>`).join('');
+}
+
+// ── 新增專案 ──
+let pickedFile = null;
+const drop = $('#drop');
+drop.onclick = () => $('#fFile').click();
+$('#fFile').onchange = e => setFile(e.target.files[0]);
+['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+function setFile(f) {
+  pickedFile = f || null;
+  drop.textContent = f ? `已選擇：${f.name}（${(f.size / 1048576).toFixed(0)} MB）` : '或把影片拖到這裡上傳';
+  drop.classList.toggle('has', !!f);
+}
+$('#newForm').onsubmit = async e => {
+  e.preventDefault();
+  const start = parseTime($('#fStart').value), end = parseTime($('#fEnd').value);
+  if (!pickedFile && !$('#fPath').value.trim()) return toast('請填影片路徑或拖曳上傳影片', true);
+  if ($('#fStart').value && isNaN(start)) return toast('開始時間格式請用 分:秒，例如 5:24', true);
+  const fd = new FormData();
+  if (pickedFile) fd.append('file', pickedFile); else fd.append('path', $('#fPath').value);
+  fd.append('start', isNaN(start) ? 0 : start);
+  if (!isNaN(end)) fd.append('end', end);
+  fd.append('source', $('#fSource').value);
+  fd.append('density', $('#fDensity').value);
+  $('#fSubmit').disabled = true;
+  $('#fSubmit').textContent = pickedFile ? '上傳中…' : '建立中…';
+  try {
+    const { id } = await api('/api/projects', { method: 'POST', body: fd });
+    setFile(null); $('#fFile').value = '';
+    await loadList();
+    openProject(id);
+  } catch (err) { toast(err.message, true); }
+  $('#fSubmit').disabled = false; $('#fSubmit').textContent = '開始處理';
+};
+
+// ── 專案列表 ──
+let current = null, meta = null, analysis = null, words = null, data = null, dirty = false, poll = null, tab = 'cues';
+async function loadList() {
+  const list = await api('/api/projects');
+  $('#plist').innerHTML = list.length ? list.map(p => `
+    <button class="pitem ${p.id === current ? 'on' : ''}" data-id="${p.id}">
+      <b>${esc(p.source || p.sourceFile.split('/').pop())}</b>
+      <span>${fmt(p.start)}–${fmt(p.end)}</span><span class="st ${p.status}">${STATUS[p.status] || p.status}</span>
+    </button>`).join('') : '<p class="hint">還沒有專案</p>';
+  $('#plist').querySelectorAll('.pitem').forEach(b => b.onclick = () => openProject(b.dataset.id));
+}
+
+async function openProject(id) {
+  if (dirty && current !== id && !confirm('有未儲存的修改，確定要切換專案嗎？')) return;
+  current = id; dirty = false; analysis = data = null;
+  $('#editor').hidden = true;
+  $('#empty').hidden = false; $('#empty').textContent = '載入中…';
+  $('#video').removeAttribute('src'); $('#video').load();
+  setOverlay(null);
+  await refresh();
+  loadList();
+}
+
+async function refresh() {
+  if (!current) return;
+  const id = current;
+  meta = await api(`/api/projects/${id}`);
+  if (id !== current) return;
+  renderStatus();
+  const isBusy = BUSY.includes(meta.status) || meta.busy;
+  clearTimeout(poll);
+  if (isBusy) poll = setTimeout(async () => { const before = meta.status; await refresh(); if (meta.status !== before) loadList(); }, 1500);
+
+  const hasClip = !['queued', 'cutting'].includes(meta.status) || meta.busy === false;
+  if (hasClip && !$('#video').src && !['queued', 'cutting'].includes(meta.status)) {
+    $('#video').src = `/api/projects/${id}/files/clip.mp4`;
+    $('#empty').hidden = true;
+    ['#play', '#seek'].forEach(s => $(s).disabled = false);
+  }
+  const analysed = ['ready', 'rendering', 'done'].includes(meta.status) || (meta.status === 'error' && meta.step === '輸出失敗');
+  if (analysed && !analysis) await loadAnalysis();
+  $('#actions').hidden = !(analysed || meta.status === 'needs_key' || meta.status === 'error');
+  $('#render').disabled = !analysed || isBusy;
+  $('#reanalyze').disabled = isBusy || !['ready', 'done', 'needs_key', 'error'].includes(meta.status);
+  $('#srcEdit').value = document.activeElement === $('#srcEdit') ? $('#srcEdit').value : meta.source;
+  $('#reDensity').value = meta.density || 'medium';
+  $('#downloads').hidden = !meta.renderedAt;
+  $('#dlMp4').href = `/api/projects/${id}/files/output.mp4?download=1`;
+  $('#viewMp4').href = `/api/projects/${id}/files/output.mp4?v=${encodeURIComponent(meta.renderedAt || '')}`;
+  $('#dlSrt').href = `/api/projects/${id}/files/subtitles.srt?download=1`;
+}
+
+function renderStatus() {
+  const isBusy = BUSY.includes(meta.status) || meta.busy;
+  const err = meta.status === 'error';
+  $('#statusWrap').innerHTML = `
+    <div class="status">
+      ${isBusy ? '<div class="spinner"></div>' : ''}
+      <span class="st ${meta.status}">${STATUS[meta.status] || meta.status}</span>
+      <span class="msg ${err ? 'err' : ''}">${esc(err ? `${meta.step}：${meta.error}` : meta.step)}</span>
+    </div>
+    ${meta.progress != null ? `<div class="bar"><i style="width:${(meta.progress * 100).toFixed(1)}%"></i></div>` : ''}`;
+}
+
+// ── 預覽 ──
+const video = $('#video'), frame = $('#overlay');
+let overlayReady = false;
+frame.addEventListener('load', () => { overlayReady = true; if (data) setOverlay(data); });
+function setOverlay(d) {
+  if (!overlayReady) return;
+  frame.contentWindow.setData(d || { cues: [], cards: [], duration: 1, source: '' });
+}
+function fit() { const w = $('#stage').clientWidth; frame.style.transform = `scale(${w / 1920})`; }
+new ResizeObserver(fit).observe($('#stage'));
+(function tick() {
+  if (overlayReady && data && frame.contentWindow.render) frame.contentWindow.render(video.currentTime || 0);
+  if (video.duration) {
+    $('#time').textContent = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+    if (!tick.seeking) $('#seek').value = video.currentTime / video.duration * 1000;
+  }
+  highlightCurrent();
+  requestAnimationFrame(tick);
+})();
+// 跳轉或時間更新時也直接重畫，避免分頁在背景時畫面迴圈暫停
+const redraw = () => { if (overlayReady && data && frame.contentWindow.render) frame.contentWindow.render(video.currentTime || 0); };
+video.addEventListener('seeked', redraw);
+video.addEventListener('timeupdate', redraw);
+$('#play').onclick = () => video.paused ? video.play() : video.pause();
+video.onplay = () => $('#play').textContent = '❚❚ 暫停';
+video.onpause = () => $('#play').textContent = '▶ 播放';
+$('#seek').oninput = e => { tick.seeking = true; if (video.duration) video.currentTime = e.target.value / 1000 * video.duration; };
+$('#seek').onchange = () => { tick.seeking = false; };
+$('#speed').onchange = e => video.playbackRate = +e.target.value;
+$('#showOverlay').onchange = e => frame.style.visibility = e.target.checked ? 'visible' : 'hidden';
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && video.src) {
+    e.preventDefault(); $('#play').click();
+  }
+});
+
+// ── 編輯 ──
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  tab = b.dataset.tab;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+  renderEditor();
+});
+
+async function loadAnalysis() {
+  const r = await api(`/api/projects/${current}/analysis`);
+  analysis = r.analysis; words = r.words;
+  data = await api(`/api/projects/${current}/data`);
+  setOverlay(data);
+  $('#editor').hidden = false;
+  setDirty(false);
+  renderEditor();
+}
+function setDirty(v) {
+  dirty = v;
+  $('#save').disabled = !v;
+  $('#dirty').textContent = v ? '有未儲存的修改' : '';
+}
+
+const typeSel = (val, opts) => `<select data-k="type">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+function cueEnglish(c) { return words.slice(c.from, c.to + 1).map(w => w.word).join(' '); }
+
+function renderEditor() {
+  if (!analysis) return;
+  const list = $('#elist');
+  if (tab === 'cues') {
+    list.innerHTML = analysis.cues.map((c, i) => `
+      <div class="item" data-i="${i}" data-start="${words[c.from]?.start ?? 0}">
+        <div class="top"><span class="tc" data-seek="${words[c.from]?.start ?? 0}">▶ ${fmt(words[c.from]?.start ?? 0)}</span></div>
+        <div class="en">${esc(cueEnglish(c))}</div>
+        <textarea data-k="zh" rows="1">${esc(c.zh)}</textarea>
+        ${c.highlights.map((h, j) => `
+          <div class="hlrow" data-j="${j}">
+            ${typeSel(h.type, [['chunk', '語塊'], ['term', '專有名詞']])}
+            <input type="text" data-k="en" value="${esc(h.en)}" placeholder="英文（照抄原句）">
+            <input type="text" data-k="hzh" value="${esc(h.zh ?? '')}" placeholder="對應中文">
+            <button class="x" data-del="${j}" title="刪除標記">×</button>
+          </div>`).join('')}
+        <button class="btn sm" data-addhl style="margin-top:8px">＋ 標記</button>
+      </div>`).join('');
+  } else {
+    list.innerHTML = analysis.cards.map((c, i) => `
+      <div class="item" data-i="${i}">
+        <div class="top"><span class="${c.type}-dot"></span>${typeSel(c.type, [['chunk', '語塊'], ['term', '專有名詞'], ['pattern', '句型']])}<span style="flex:1"></span><button class="x" data-delcard title="刪除卡片">×</button></div>
+        <label>對應的字幕標記（英文）</label><input type="text" data-k="anchor" value="${esc(c.anchor)}">
+        <div class="row"><div><label>標題</label><input type="text" data-k="phrase" value="${esc(c.phrase)}"></div><div><label>縮寫</label><input type="text" data-k="abbr" value="${esc(c.abbr ?? '')}"></div></div>
+        <label>中文意思</label><input type="text" data-k="zh" value="${esc(c.zh)}">
+        <label>用法說明</label><textarea data-k="note">${esc(c.note)}</textarea>
+        <div class="row"><div><label>例句（英）</label><input type="text" data-k="exEn" value="${esc(c.example?.en ?? '')}"></div><div><label>例句（中）</label><input type="text" data-k="exZh" value="${esc(c.example?.zh ?? '')}"></div></div>
+        <div class="row"><div><label>附帶專有名詞</label><input type="text" data-k="xPhrase" value="${esc(c.extraTerm?.phrase ?? '')}"></div><div><label>附帶名詞說明</label><input type="text" data-k="xZh" value="${esc(c.extraTerm?.zh ?? '')}"></div></div>
+        ${c.compare ? `<p class="hint">比較數據：${c.compare.map(x => `${esc(x.label)} ${x.value}`).join('、')}</p>` : ''}
+      </div>`).join('') + `<button class="btn sm" id="addCard">＋ 新增卡片</button>`;
+    $('#addCard').onclick = () => {
+      analysis.cards.push({ type: 'chunk', anchor: '', phrase: '', abbr: null, zh: '', note: '', example: null, compare: null, extraTerm: null });
+      setDirty(true); renderEditor();
+    };
+  }
+}
+
+$('#elist').addEventListener('click', e => {
+  const seek = e.target.closest('[data-seek]');
+  if (seek) { video.currentTime = +seek.dataset.seek; return; }
+  const item = e.target.closest('.item');
+  if (!item) return;
+  const i = +item.dataset.i;
+  if (e.target.matches('[data-del]')) { analysis.cues[i].highlights.splice(+e.target.dataset.del, 1); setDirty(true); renderEditor(); }
+  if (e.target.matches('[data-addhl]')) { analysis.cues[i].highlights.push({ type: 'chunk', en: '', zh: null }); setDirty(true); renderEditor(); }
+  if (e.target.matches('[data-delcard]')) { analysis.cards.splice(i, 1); setDirty(true); renderEditor(); }
+});
+$('#elist').addEventListener('input', e => {
+  const item = e.target.closest('.item'), k = e.target.dataset.k;
+  if (!item || !k) return;
+  const i = +item.dataset.i, v = e.target.value;
+  if (tab === 'cues') {
+    const row = e.target.closest('.hlrow');
+    if (row) {
+      const h = analysis.cues[i].highlights[+row.dataset.j];
+      if (k === 'type') h.type = v; else if (k === 'en') h.en = v; else if (k === 'hzh') h.zh = v.trim() || null;
+    } else if (k === 'zh') analysis.cues[i].zh = v;
+  } else {
+    const c = analysis.cards[i];
+    if (['type', 'anchor', 'phrase', 'zh', 'note'].includes(k)) c[k] = v;
+    if (k === 'abbr') c.abbr = v.trim() || null;
+    if (k === 'exEn' || k === 'exZh') {
+      const ex = { en: c.example?.en ?? '', zh: c.example?.zh ?? '', [k === 'exEn' ? 'en' : 'zh']: v };
+      c.example = ex.en.trim() ? ex : null;
+    }
+    if (k === 'xPhrase' || k === 'xZh') {
+      const x = { phrase: c.extraTerm?.phrase ?? '', zh: c.extraTerm?.zh ?? '', [k === 'xPhrase' ? 'phrase' : 'zh']: v };
+      c.extraTerm = x.phrase.trim() ? x : null;
+    }
+    if (k === 'type') item.querySelector('.top span').className = `${v}-dot`;
+  }
+  setDirty(true);
+});
+
+function highlightCurrent() {
+  if (tab !== 'cues' || !analysis) return;
+  const t = video.currentTime;
+  let cur = null;
+  $('#elist').querySelectorAll('.item').forEach(el => { if (+el.dataset.start <= t + 0.05) cur = el; });
+  $('#elist').querySelectorAll('.item.now').forEach(el => el !== cur && el.classList.remove('now'));
+  if (cur && !cur.classList.contains('now')) {
+    cur.classList.add('now');
+    if (!video.paused) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+$('#save').onclick = async () => {
+  try {
+    data = await api(`/api/projects/${current}/analysis`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(analysis) });
+    setOverlay(data); setDirty(false);
+    const lost = analysis.cards.length - data.cards.length;
+    toast(lost > 0 ? `已更新預覽（${lost} 張卡片找不到對應的字幕標記，沒有顯示）` : '已更新預覽', lost > 0);
+  } catch (err) { toast(err.message, true); }
+};
+$('#srcSave').onclick = async () => {
+  try {
+    data = await api(`/api/projects/${current}/meta`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: $('#srcEdit').value }) });
+    setOverlay(data); toast('來源名稱已更新'); loadList();
+  } catch (err) { toast(err.message, true); }
+};
+$('#reanalyze').onclick = async () => {
+  if (!confirm('重新分析會覆蓋目前的翻譯和卡片修改，確定嗎？')) return;
+  try {
+    await api(`/api/projects/${current}/reanalyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ density: $('#reDensity').value }) });
+    analysis = data = null; $('#editor').hidden = true; setDirty(false);
+    refresh(); loadHealth();
+  } catch (err) { toast(err.message, true); }
+};
+$('#render').onclick = async () => {
+  if (dirty) return toast('請先儲存修改，再輸出影片', true);
+  try { await api(`/api/projects/${current}/render`, { method: 'POST' }); video.pause(); refresh(); }
+  catch (err) { toast(err.message, true); }
+};
+window.addEventListener('beforeunload', e => { if (dirty) e.preventDefault(); });
+
+loadHealth();
+loadList();
+</script>
+</body>
+</html>
