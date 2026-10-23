@@ -1,14 +1,13 @@
 // 拓曜字幕工作室：本機伺服器（只綁 127.0.0.1）
 import express from 'express';
 import multer from 'multer';
-import Anthropic from '@anthropic-ai/sdk';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, writeFile, readdir, rename, rm } from 'node:fs/promises';
 import { join, dirname, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { probe, cutClip, transcribe, run, VIDEO_EXTS } from './lib/media.mjs';
-import { analyze, buildOverlayData, toSrt, Analysis } from './lib/analyze.mjs';
+import { analyze, buildOverlayData, toSrt, Analysis, llmStatus } from './lib/analyze.mjs';
 import { renderVideo } from './lib/render.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,7 +49,6 @@ async function patchMeta(id, patch) {
   return meta;
 }
 const stamp = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 const busy = new Set();
 
 async function rebuild(id) {
@@ -67,11 +65,12 @@ async function rebuild(id) {
 
 async function runAnalyze(id) {
   const meta = await readJson(id, 'meta.json');
-  if (!hasKey()) {
-    await patchMeta(id, { status: 'needs_key', step: '已完成聽寫。請在 .env 填入 ANTHROPIC_API_KEY，重新啟動工具後按「重新分析」。' });
+  const llm = llmStatus();
+  if (!llm.ready) {
+    await patchMeta(id, { status: 'needs_key', step: `已完成聽寫。${llm.reason}，重新啟動工具後按「重新分析」。` });
     return;
   }
-  await patchMeta(id, { status: 'analyzing', step: 'Claude 正在翻譯、挑選語塊與專有名詞…', error: null });
+  await patchMeta(id, { status: 'analyzing', step: `${llm.label} 正在翻譯、挑選語塊與專有名詞…`, error: null });
   const words = await readJson(id, 'words.json');
   const analysis = await analyze(words, { source: meta.source, density: meta.density });
   await writeJson(id, 'analysis.json', analysis);
@@ -104,7 +103,7 @@ const wrap = fn => (req, res) => fn(req, res).catch(e => res.status(e.status || 
 app.get('/api/health', wrap(async (_req, res) => {
   const check = async (cmd, args) => { try { await run(cmd, args); return true; } catch { return false; } };
   res.json({
-    apiKey: hasKey(),
+    llm: llmStatus(),
     ffmpeg: await check('ffmpeg', ['-version']),
     whisper: await check('whisper', ['--help']),
     whisperModel: process.env.WHISPER_MODEL || 'medium.en',
@@ -189,7 +188,7 @@ app.post('/api/projects/:id/reanalyze', wrap(async (req, res) => {
   if (req.body?.density) await patchMeta(id, { density: req.body.density });
   busy.add(id);
   runAnalyze(id)
-    .catch(e => patchMeta(id, { status: 'error', error: e instanceof Anthropic.AuthenticationError ? 'API 金鑰無效，請檢查 .env' : e.message, step: '分析失敗' }))
+    .catch(e => patchMeta(id, { status: 'error', error: e.message, step: '分析失敗' }))
     .finally(() => busy.delete(id));
   res.json({ ok: true });
 }));
@@ -233,5 +232,6 @@ app.listen(PORT, '127.0.0.1', err => {
     process.exit(1);
   }
   console.log(`拓曜字幕工作室已啟動：http://127.0.0.1:${PORT}`);
-  if (!hasKey()) console.log('⚠ 尚未設定 ANTHROPIC_API_KEY（.env），翻譯分析步驟會暫停');
+  const llm = llmStatus();
+  console.log(llm.ready ? `AI 分析：${llm.label} · ${llm.model}` : `⚠ AI 分析尚未設定：${llm.reason}（翻譯分析步驟會暫停）`);
 });

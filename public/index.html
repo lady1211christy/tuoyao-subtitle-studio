@@ -140,7 +140,7 @@
         <option value="high">多：每 2–3 秒 1 張</option>
       </select>
       <button class="btn primary block" id="fSubmit">開始處理</button>
-      <p class="hint">一次最多 10 分鐘。流程：裁切 → 聽寫 → Claude 翻譯分析。</p>
+      <p class="hint">一次最多 10 分鐘。流程：裁切 → 聽寫 → AI 翻譯分析。</p>
     </form>
     <div class="panel">
       <div class="sec-title">我的專案</div>
@@ -222,7 +222,7 @@ async function api(url, opts = {}) {
 async function loadHealth() {
   const h = await api('/api/health');
   $('#health').innerHTML = [
-    [h.apiKey, h.apiKey ? 'Claude API 已連線' : 'Claude API 金鑰未設定'],
+    [h.llm.ready, h.llm.ready ? `${h.llm.label} · ${h.llm.model}` : `${h.llm.label} 未設定`],
     [h.whisper, `whisper · ${h.whisperModel}`],
     [h.ffmpeg, 'ffmpeg'],
   ].map(([ok, t]) => `<span class="pill ${ok ? 'ok' : 'bad'}">${ok ? '●' : '○'} ${esc(t)}</span>`).join('');

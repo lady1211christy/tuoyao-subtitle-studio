@@ -22,7 +22,7 @@
    cd ~/Sites/subtitle-studio && npm install
    ```
 
-2. 設定 Claude API 金鑰：把 `.env.example` 複製成 `.env`，在 `ANTHROPIC_API_KEY=` 後面貼上金鑰。`.env` 已列在 `.gitignore`，不會被提交。
+2. 設定 AI 金鑰：把 `.env.example` 複製成 `.env`，在 `ANTHROPIC_API_KEY=` 後面貼上你自己的 Claude API 金鑰。想改用其他 AI，請看下方「改用其他 AI」。`.env` 已列在 `.gitignore`，不會被提交。
 
 3. 啟動工具，然後打開 http://127.0.0.1:5177
 
@@ -32,10 +32,30 @@
 
 需要的本機工具：`ffmpeg`、`whisper`（openai-whisper）、Node.js 20.12 以上。第一次聽寫時，whisper 會先下載模型（medium.en 約 1.4 GB）。
 
+## 改用其他 AI
+
+翻譯分析預設使用 Claude（`claude-opus-5-5`），品質最穩，建議優先使用。也可以在 `.env` 改用其他 AI，`.env.example` 裡有各家的設定範例：
+
+| `LLM_PROVIDER` | 服務 | 需要填 |
+|---|---|---|
+| `anthropic`（預設） | Claude | `ANTHROPIC_API_KEY` |
+| `openai` | OpenAI | `LLM_API_KEY`、`LLM_MODEL` |
+| `gemini` | Google Gemini | `LLM_API_KEY`、`LLM_MODEL` |
+| `ollama` | Ollama（本機開源模型，免費） | `LLM_MODEL` |
+| `custom` | 其他 OpenAI 相容服務（OpenRouter、DeepSeek、Groq 等） | `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` |
+
+改完 `.env` 要重新啟動工具。網頁右上角的狀態燈會顯示目前使用的 AI 和模型。
+
+注意事項：
+
+- **品質看模型**：分句、台灣用語翻譯、語塊挑選都很吃模型能力。小型開源模型可能翻得生硬、卡片挑不準，也可能回傳格式錯誤（工具會自動重試一次）。
+- **實測狀況**：Claude 已實測，品質穩定。Ollama 已實測能完整跑完流程，但用兩年前的 8B 小模型（llama3-taide）時，分句和翻譯品質明顯較差，建議用較新、較大的模型。OpenAI、Gemini 和其他服務走同一套接口，但作者尚未用真實金鑰實測。
+- 費用記在你自己的 AI 帳號。
+
 ## 使用流程
 
 1. **新增專案**：填影片檔路徑，或把影片拖進上傳區；再填開始、結束時間（格式為 `分:秒`，可以有小數，例如 `5:22.4`）和影片來源名稱。
-2. **自動處理**：裁切 → whisper 聽寫英文 → Claude 分句、翻譯、挑語塊與專有名詞、寫學習卡片。
+2. **自動處理**：裁切 → whisper 聽寫英文 → AI 分句、翻譯、挑語塊與專有名詞、寫學習卡片。
 3. **預覽與修改**：
    - 字幕與標記：修改中文翻譯、新增或刪除螢光筆標記（語塊用綠色、專有名詞用紫色）
    - 學習卡片：修改標題、中文意思、用法說明、例句
@@ -81,6 +101,7 @@ MIT 授權只涵蓋程式碼。以下屬於拓曜知識宇宙的品牌識別，*
 |---|---|
 | [openai-whisper](https://github.com/openai/whisper)（語音聽寫） | MIT |
 | [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript)（Claude API） | Apache-2.0 |
+| [openai](https://github.com/openai/openai-node)（OpenAI 相容接口） | Apache-2.0 |
 | [Puppeteer](https://pptr.dev/)（渲染字幕圖層） | Apache-2.0 |
 | [Express](https://expressjs.com/)、[Multer](https://github.com/expressjs/multer)、[Zod](https://zod.dev/) | MIT |
 | [FFmpeg](https://ffmpeg.org/)（需自行安裝） | LGPL／GPL |
@@ -91,7 +112,7 @@ MIT 授權只涵蓋程式碼。以下屬於拓曜知識宇宙的品牌識別，*
 ```
 server.mjs          本機伺服器（只開在 127.0.0.1）
 lib/media.mjs       ffmpeg 裁切、whisper 聽寫
-lib/analyze.mjs     Claude 分析（claude-opus-5-5、結構化輸出）、時間軸對齊、SRT
+lib/analyze.mjs     AI 分析（預設 Claude；OpenAI 相容接口）、時間軸對齊、SRT
 lib/render.mjs      逐格渲染字幕圖層，再用 ffmpeg 合成
 public/index.html   操作介面
 public/overlay.html 字幕與學習卡片版面（品牌色）
