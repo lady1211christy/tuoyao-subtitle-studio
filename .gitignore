@@ -14,6 +14,8 @@ projects/
 *.wav
 *.webm
 demo/threads/
+# README 用的示範影片（已註明出處）
+!docs/*.mp4
 
 # 系統檔
 .DS_Store

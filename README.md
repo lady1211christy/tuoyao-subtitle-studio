@@ -2,6 +2,18 @@
 
 把英文影片片段做成「中英雙語字幕＋英文語塊學習卡片」的教學影片，配色沿用拓曜知識宇宙官網品牌色。
 
+## 示範
+
+[![10 秒示範：中英雙語字幕、語塊螢光筆、專有名詞學習卡片](docs/demo.gif)](docs/demo.mp4)
+
+點上方動畫可以看完整、有聲音的示範影片。
+
+| 首頁 | 預覽與編輯 |
+|---|---|
+| ![首頁：新增專案與預覽播放器](docs/screenshot-home.webp) | ![預覽與編輯：字幕、學習卡片與輸出](docs/screenshot-editor.webp) |
+
+> 示範影片素材出處：Figure AI《[Figure All Hands 2026](https://www.youtube.com/watch?v=AoFwpf43wK0&t=322s)》05:22–05:34，約 12 秒片段。僅用於展示本工具的字幕與學習卡片功能，影片內容版權屬 Figure AI 所有。
+
 ## 第一次使用
 
 1. 安裝套件：
