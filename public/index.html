@@ -21,7 +21,7 @@
   button, input, select, textarea { font: inherit; color: inherit; }
   a { color: var(--mint); }
 
-  header { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
   header img { width: 36px; height: 36px; border-radius: 50%; background: #fff; }
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: .04em; }
   header h1 small { display: block; font-size: 11px; font-weight: 500; color: var(--mint); letter-spacing: .18em; }
@@ -62,8 +62,8 @@
   .btn.block { width: 100%; margin-top: 14px; }
   .btn.sm { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
 
-  .plist { display: grid; gap: 8px; }
-  .pitem { text-align: left; width: 100%; background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+  .plist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .pitem { text-align: left; width: 100%; min-width: 0; background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; cursor: pointer; }
   .pitem.on { border-color: var(--mint); }
   .pitem b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pitem span { font-size: 12px; color: var(--text-3); }
