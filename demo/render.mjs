@@ -1,12 +1,9 @@
 // 逐格把 overlay.html 截成透明 PNG
 // 用法：node render.mjs <輸出資料夾> [--at 2.4,4.4]   （--at 只渲染指定秒數，做樣張用）
-import { createRequire } from 'node:module';
+import puppeteer from 'puppeteer';
 import { mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
-const require = createRequire('/Users/tingting/node_modules/');
-const puppeteer = require('puppeteer');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const out = resolve(process.argv[2] || 'frames');
