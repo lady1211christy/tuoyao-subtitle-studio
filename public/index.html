@@ -26,6 +26,9 @@
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: .04em; }
   header h1 small { display: block; font-size: 11px; font-weight: 500; color: var(--mint); letter-spacing: .18em; }
   .health { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .credit { font-size: 12px; color: var(--text-3); text-decoration: none; white-space: nowrap; }
+  .credit b { color: var(--aqua); font-weight: 500; }
+  .credit:hover b { color: var(--mint); text-decoration: underline; }
   .pill { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--text-2); white-space: nowrap; }
   .pill.ok { border-color: rgba(59,206,182,.5); color: var(--mint); }
   .pill.bad { border-color: rgba(255,122,122,.5); color: var(--danger); }
@@ -119,6 +122,7 @@
 <header>
   <img src="/logo.png" alt="">
   <h1>拓曜字幕工作室<small>TUOYAO SUBTITLE STUDIO</small></h1>
+  <a class="credit" href="https://tuoyaoco.com" target="_blank" rel="noopener">工具出自 <b>拓曜知識宇宙 ↗</b></a>
   <div class="health" id="health"></div>
 </header>
 
