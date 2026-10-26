@@ -7,7 +7,7 @@ import { join, dirname, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { probe, cutClip, transcribe, run, VIDEO_EXTS } from './lib/media.mjs';
-import { analyze, buildOverlayData, toSrt, Analysis, llmStatus } from './lib/analyze.mjs';
+import { analyze, buildOverlayData, toSrt, Analysis, EnEdits, applyEnEdits, llmStatus } from './lib/analyze.mjs';
 import { renderVideo } from './lib/render.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -170,7 +170,17 @@ app.get('/api/projects/:id/analysis', wrap(async (req, res) => {
 }));
 
 app.put('/api/projects/:id/analysis', wrap(async (req, res) => {
-  const analysis = Analysis.parse(req.body);
+  const { enEdits, ...body } = req.body;
+  const analysis = Analysis.parse(body);
+  const edits = EnEdits.parse(enEdits ?? []);
+  if (edits.length) {
+    const words = await readJson(req.params.id, 'words.json');
+    // 第一次手動修改前，保留一份 whisper 原始聽寫
+    if (!existsSync(join(pdir(req.params.id), 'words.orig.json'))) await writeJson(req.params.id, 'words.orig.json', words);
+    const r = applyEnEdits(words, analysis.cues, edits);
+    analysis.cues = r.cues;
+    await writeJson(req.params.id, 'words.json', r.words);
+  }
   await writeJson(req.params.id, 'analysis.json', analysis);
   res.json(await rebuild(req.params.id));
 }));

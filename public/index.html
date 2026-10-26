@@ -97,7 +97,10 @@
   .item.now { border-color: rgba(59,206,182,.6); }
   .item .top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .item .tc { font-size: 12px; color: var(--mint); cursor: pointer; font-variant-numeric: tabular-nums; }
-  .item .en { font-size: 14px; line-height: 1.5; margin-bottom: 6px; }
+  .item textarea.en { font-size: 14px; line-height: 1.5; margin-bottom: 6px; min-height: 0; field-sizing: content; resize: none; padding: 4px 8px; background: transparent; border-color: transparent; }
+  .item textarea.en:hover { border-color: var(--line); }
+  .item textarea.en:focus { border-color: var(--mint); background: var(--panel); }
+  .item textarea.en.edited { border-color: var(--warn); }
   .hlrow { display: grid; grid-template-columns: 82px 1fr 1fr 28px; gap: 6px; margin-top: 6px; }
   .hlrow select, .hlrow input { padding: 5px 8px; font-size: 13px; }
   .x { border: 0; background: transparent; color: var(--text-3); cursor: pointer; font-size: 16px; }
@@ -265,6 +268,7 @@ $('#newForm').onsubmit = async e => {
 
 // ── 專案列表 ──
 let current = null, meta = null, analysis = null, words = null, data = null, dirty = false, poll = null, tab = 'cues';
+let enEdits = {}; // 手動修改過的英文原文：字幕索引 → 文字
 async function loadList() {
   const list = await api('/api/projects');
   $('#plist').innerHTML = list.length ? list.map(p => `
@@ -372,7 +376,7 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
 
 async function loadAnalysis() {
   const r = await api(`/api/projects/${current}/analysis`);
-  analysis = r.analysis; words = r.words;
+  analysis = r.analysis; words = r.words; enEdits = {};
   data = await api(`/api/projects/${current}/data`);
   setOverlay(data);
   $('#editor').hidden = false;
@@ -386,7 +390,7 @@ function setDirty(v) {
 }
 
 const typeSel = (val, opts) => `<select data-k="type">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-function cueEnglish(c) { return words.slice(c.from, c.to + 1).map(w => w.word).join(' '); }
+function cueEnglish(c, i) { return enEdits[i] ?? words.slice(c.from, c.to + 1).map(w => w.word).join(' '); }
 
 function renderEditor() {
   if (!analysis) return;
@@ -395,7 +399,7 @@ function renderEditor() {
     list.innerHTML = analysis.cues.map((c, i) => `
       <div class="item" data-i="${i}" data-start="${words[c.from]?.start ?? 0}">
         <div class="top"><span class="tc" data-seek="${words[c.from]?.start ?? 0}">▶ ${fmt(words[c.from]?.start ?? 0)}</span></div>
-        <div class="en">${esc(cueEnglish(c))}</div>
+        <textarea class="en ${i in enEdits ? 'edited' : ''}" data-k="en" rows="1" title="英文原文聽錯時可以直接修改">${esc(cueEnglish(c, i))}</textarea>
         <textarea data-k="zh" rows="1">${esc(c.zh)}</textarea>
         ${c.highlights.map((h, j) => `
           <div class="hlrow" data-j="${j}">
@@ -445,6 +449,7 @@ $('#elist').addEventListener('input', e => {
       const h = analysis.cues[i].highlights[+row.dataset.j];
       if (k === 'type') h.type = v; else if (k === 'en') h.en = v; else if (k === 'hzh') h.zh = v.trim() || null;
     } else if (k === 'zh') analysis.cues[i].zh = v;
+    else if (k === 'en') { enEdits[i] = v; e.target.classList.add('edited'); }
   } else {
     const c = analysis.cards[i];
     if (['type', 'anchor', 'phrase', 'zh', 'note'].includes(k)) c[k] = v;
@@ -476,8 +481,17 @@ function highlightCurrent() {
 
 $('#save').onclick = async () => {
   try {
-    data = await api(`/api/projects/${current}/analysis`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(analysis) });
+    const edits = Object.entries(enEdits).map(([cue, text]) => ({ cue: +cue, text }));
+    if (edits.some(e => !e.text.trim())) return toast('英文原文不能是空白', true);
+    data = await api(`/api/projects/${current}/analysis`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...analysis, enEdits: edits }) });
     setOverlay(data); setDirty(false);
+    if (edits.length) {
+      // 英文改了字數會影響後面每句的字編號，從伺服器重新載入
+      const r = await api(`/api/projects/${current}/analysis`);
+      const top = $('#elist').scrollTop;
+      analysis = r.analysis; words = r.words; enEdits = {};
+      renderEditor(); $('#elist').scrollTop = top;
+    }
     const lost = analysis.cards.length - data.cards.length;
     toast(lost > 0 ? `已更新預覽（${lost} 張卡片找不到對應的字幕標記，沒有顯示）` : '已更新預覽', lost > 0);
   } catch (err) { toast(err.message, true); }
