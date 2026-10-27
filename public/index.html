@@ -496,7 +496,12 @@ function highlightCurrent() {
   $('#elist').querySelectorAll('.item.now').forEach(el => el !== cur && el.classList.remove('now'));
   if (cur && !cur.classList.contains('now')) {
     cur.classList.add('now');
-    if (!video.paused) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // 只捲字幕清單本身，不用 scrollIntoView，以免整個頁面跟著跳走、看不到影片
+    if (!video.paused) {
+      const list = $('#elist'), lr = list.getBoundingClientRect(), cr = cur.getBoundingClientRect();
+      if (cr.top < lr.top) list.scrollBy({ top: cr.top - lr.top, behavior: 'smooth' });
+      else if (cr.bottom > lr.bottom) list.scrollBy({ top: cr.bottom - lr.bottom, behavior: 'smooth' });
+    }
   }
 }
 
