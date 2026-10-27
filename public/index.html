@@ -345,11 +345,13 @@ function setOverlay(d) {
 }
 function fit() { const w = $('#stage').clientWidth; frame.style.transform = `scale(${w / 1920})`; }
 new ResizeObserver(fit).observe($('#stage'));
+// 拖曳拉條中：畫面迴圈不要把拉條拉回目前時間
+let seeking = false, resumeAfterSeek = false;
 (function tick() {
   if (overlayReady && data && frame.contentWindow.render) frame.contentWindow.render(video.currentTime || 0);
   if (video.duration) {
     $('#time').textContent = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
-    if (!tick.seeking) $('#seek').value = video.currentTime / video.duration * 1000;
+    if (!seeking) $('#seek').value = video.currentTime / video.duration * 1000;
   }
   highlightCurrent();
   requestAnimationFrame(tick);
@@ -361,8 +363,23 @@ video.addEventListener('timeupdate', redraw);
 $('#play').onclick = () => video.paused ? video.play() : video.pause();
 video.onplay = () => $('#play').textContent = '❚❚ 暫停';
 video.onpause = () => $('#play').textContent = '▶ 播放';
-$('#seek').oninput = e => { tick.seeking = true; if (video.duration) video.currentTime = e.target.value / 1000 * video.duration; };
-$('#seek').onchange = () => { tick.seeking = false; };
+// 一按下拉條就停止同步，拖曳時先暫停、放開後再接著播，播放中也能順手拖
+const seekStart = () => {
+  if (seeking) return;
+  seeking = true;
+  resumeAfterSeek = !video.paused;
+  video.pause();
+};
+const seekEnd = () => {
+  if (!seeking) return;
+  seeking = false;
+  if (resumeAfterSeek) video.play();
+};
+$('#seek').addEventListener('pointerdown', seekStart);
+$('#seek').oninput = e => { seekStart(); if (video.duration) video.currentTime = e.target.value / 1000 * video.duration; };
+$('#seek').onchange = seekEnd;
+window.addEventListener('pointerup', seekEnd);
+window.addEventListener('pointercancel', seekEnd);
 $('#speed').onchange = e => video.playbackRate = +e.target.value;
 $('#showOverlay').onchange = e => frame.style.visibility = e.target.checked ? 'visible' : 'hidden';
 document.addEventListener('keydown', e => {
